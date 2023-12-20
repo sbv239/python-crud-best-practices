@@ -3,9 +3,15 @@ import psycopg2
 import uvicorn
 from psycopg2.extras import RealDictCursor
 import os
+import yaml
 from dotenv import load_dotenv
 
 app = FastAPI()
+
+
+def config():
+    with open('params.yaml', 'r') as f:
+        return yaml.safe_load(f)
 
 
 def get_db():
@@ -17,6 +23,20 @@ def get_db():
             database=os.environ["POSTGRES_DATABASE"]
     ) as conn:
         return conn
+
+
+@app.get("/user/feed")
+def get_user_feed(user_id: int, limit: int = 10, conn=Depends(get_db), config: dict = Depends(config)):
+    with conn.cursor() as cursor:
+        cursor.execute("""
+        SELECT *
+        FROM feed_action
+        WHERE user_id = %(user_id)s AND time >= %(start_date)s
+        ORDER BY time
+        LIMIT %(limit)s
+        """,
+                       {'user_id': user_id, 'limit': limit, 'start_date': config['feed_start_date']})
+        return cursor.fetchall()
 
 
 @app.get("/user/")
