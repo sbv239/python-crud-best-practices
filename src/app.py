@@ -1,16 +1,18 @@
+from pathlib import Path
+
 from fastapi import FastAPI, Depends
 import psycopg2
 import uvicorn
-from psycopg2.extras import RealDictCursor
 import os
 import yaml
 from dotenv import load_dotenv
+from src.crud import get_feed, get_user
 
 app = FastAPI()
 
 
 def config():
-    with open('params.yaml', 'r') as f:
+    with open(Path(__file__).parent.parent / 'params.yaml', 'r') as f:
         return yaml.safe_load(f)
 
 
@@ -27,27 +29,12 @@ def get_db():
 
 @app.get("/user/feed")
 def get_user_feed(user_id: int, limit: int = 10, conn=Depends(get_db), config: dict = Depends(config)):
-    with conn.cursor() as cursor:
-        cursor.execute("""
-        SELECT *
-        FROM feed_action
-        WHERE user_id = %(user_id)s AND time >= %(start_date)s
-        ORDER BY time
-        LIMIT %(limit)s
-        """,
-                       {'user_id': user_id, 'limit': limit, 'start_date': config['feed_start_date']})
-        return cursor.fetchall()
+    return get_user(user_id, limit, conn, config)
 
 
 @app.get("/user/")
 def get_all_users(limit: int = 10, conn=Depends(get_db)):
-    with conn.cursor(cursor_factory=RealDictCursor) as cursor:
-        cursor.execute("""
-        SELECT * 
-        FROM "user"
-        LIMIT %(limit_user)s
-        """, {'limit_user': limit})
-        return cursor.fetchall()
+    return get_feed(limit, conn)
 
 
 if __name__ == '__main__':
